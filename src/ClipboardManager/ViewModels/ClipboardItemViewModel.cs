@@ -37,8 +37,28 @@ public class ClipboardItemViewModel : Mvvm.ObservableObject
     }
 
     public DateTime CreatedAt { get; set; }
-    public bool IsFavorite { get; set; }
-    public bool IsPinned { get; set; }
+    
+    private bool _isFavorite;
+    public bool IsFavorite
+    {
+        get => _isFavorite;
+        set => SetProperty(ref _isFavorite, value);
+    }
+
+    private bool _isPinned;
+    public bool IsPinned
+    {
+        get => _isPinned;
+        set => SetProperty(ref _isPinned, value);
+    }
+
+    private int _orderIndex;
+    public int OrderIndex
+    {
+        get => _orderIndex;
+        set => SetProperty(ref _orderIndex, value);
+    }
+
     public int UseCount { get; set; }
 
     private string? _groupName;
@@ -61,7 +81,7 @@ public class ClipboardItemViewModel : Mvvm.ObservableObject
         }
     }
 
-    public string TagsDisplay => Tags.Count == 0 ? "—" : string.Join(" · ", Tags);
+    public string TagsDisplay => Tags.Count == 0 ? "—" : string.Join(" ", Tags.Select(t => "#" + t));
 
     /// <summary>UI yardimcilari:</summary>
     public string TypeIcon => Kind switch

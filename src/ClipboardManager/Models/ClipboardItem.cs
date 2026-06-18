@@ -34,6 +34,8 @@ public class ClipboardItem
 
     public bool IsPinned { get; set; }
 
+    public int OrderIndex { get; set; } = 0;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? LastUsedAt { get; set; }

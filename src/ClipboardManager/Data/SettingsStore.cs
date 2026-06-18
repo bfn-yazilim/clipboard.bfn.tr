@@ -13,7 +13,8 @@ public class SettingsStore
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals
     };
 
     private readonly string _filePath;
@@ -40,6 +41,13 @@ public class SettingsStore
     public void Save(AppSettings settings)
     {
         var json = JsonSerializer.Serialize(settings, JsonOpts);
+        
+        var dir = Path.GetDirectoryName(_filePath);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+
         File.WriteAllText(_filePath, json);
     }
 }

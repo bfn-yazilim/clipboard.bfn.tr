@@ -8,11 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ClipboardManager.ViewModels;
 
-/// <summary>
-/// Ana pencere ViewModel'i. Pano dinleme, grup filtreleme, arama, etiket yonetimi
-/// ve yapistirma (auto-paste) mantigini koordine eder.
-/// </summary>
-public class MainViewModel : Mvvm.ObservableObject, IDisposable
+public class MainViewModel : Mvvm.ObservableObject, IDisposable, GongSolutions.Wpf.DragDrop.IDropTarget
 {
     private readonly ClipboardRepository _repo;
     private readonly IClipboardListener _listener;
@@ -20,23 +16,19 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable
     private readonly IDialogService _dialogs;
     private readonly SettingsStore _settings;
 
-    // Sinirli sayida hotkey id
     private const int HotkeyShowWindow = 9001;
+    public const int AllTagsId = 0;
 
-    // Secili grup: null/0 = "Tumu"
-    public const int AllGroupsId = 0;
-
-    public ObservableCollection<GroupViewModel> Groups { get; } = new();
+    public ObservableCollection<TagViewModel> Tags { get; } = new();
     public ObservableCollection<ClipboardItemViewModel> Items { get; } = new();
-    public ObservableCollection<string> AllTags { get; } = new();
 
-    private GroupViewModel? _selectedGroup;
-    public GroupViewModel? SelectedGroup
+    private TagViewModel? _selectedTag;
+    public TagViewModel? SelectedTag
     {
-        get => _selectedGroup;
+        get => _selectedTag;
         set
         {
-            if (SetProperty(ref _selectedGroup, value))
+            if (SetProperty(ref _selectedTag, value))
             {
                 _ = LoadItemsAsync();
             }
@@ -80,32 +72,30 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable
         _dialogs = dialogs;
         _settings = settings;
 
-        SelectGroupCommand = new Mvvm.RelayCommand<GroupViewModel>(g =>
+        SelectTagCommand = new Mvvm.RelayCommand<TagViewModel>(t =>
         {
-            SelectedGroup = g;
-            foreach (var x in Groups) x.IsSelected = x == g;
+            SelectedTag = t;
+            foreach (var x in Tags) x.IsSelected = x == t;
         });
 
         PasteItemCommand = new Mvvm.AsyncRelayCommand<ClipboardItemViewModel>(PasteItemAsync);
-        AssignGroupCommand = new Mvvm.AsyncRelayCommand<ClipboardItemViewModel>(AssignGroupAsync);
-        AddTagCommand = new Mvvm.AsyncRelayCommand<ClipboardItemViewModel>(AddTagAsync);
         DeleteItemCommand = new Mvvm.AsyncRelayCommand<ClipboardItemViewModel>(DeleteItemAsync);
         ToggleFavoriteCommand = new Mvvm.AsyncRelayCommand<ClipboardItemViewModel>(ToggleFavoriteAsync);
+        TogglePinCommand = new Mvvm.AsyncRelayCommand<ClipboardItemViewModel>(TogglePinAsync);
         CopyToClipboardCommand = new Mvvm.AsyncRelayCommand<ClipboardItemViewModel>(CopyOnlyAsync);
 
-        AddGroupCommand = new Mvvm.AsyncRelayCommand(AddGroupAsync);
-        AddTagGlobalCommand = new Mvvm.AsyncRelayCommand(AddTagGlobalAsync);
+        AddTagCommand = new Mvvm.AsyncRelayCommand(AddTagAsync);
+        BeginEditTagCommand = new Mvvm.RelayCommand<TagViewModel>(t => { if (t != null && !t.IsSystem) t.IsEditing = true; });
+        EndEditTagCommand = new Mvvm.AsyncRelayCommand<TagViewModel>(SaveTagAsync);
+        ToggleItemTagCommand = new Mvvm.AsyncRelayCommand<object>(ToggleItemTagAsync);
+
         ClearSearchCommand = new Mvvm.RelayCommand(() => SearchText = string.Empty);
         RefreshCommand = new Mvvm.AsyncRelayCommand(() => InitializeAsync());
 
-        // Pano dinleyiciyi bagla
         _listener.ClipboardChanged += OnClipboardChanged;
-
-        // Ilk yukleme
         _ = InitializeAsync();
     }
 
-    /// <summary>Window HWND set edilince cagrilmali (Hotkey + Clipboard listener baslat).</summary>
     public void AttachToWindow(IntPtr hwnd)
     {
         _listener.Start(hwnd);
@@ -115,65 +105,55 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable
             var mods = ClipboardManager.Interop.HotkeyParser.ParseModifiers(s.ShowWindowHotkey.Modifiers);
             var vk = ClipboardManager.Interop.HotkeyParser.ParseVirtualKey(s.ShowWindowHotkey.Key);
             if (App.HotkeyService.Register(hwnd, HotkeyShowWindow, mods, vk))
-            {
                 App.HotkeyService.HotkeyPressed += OnHotkeyPressed;
-            }
         }
-        catch
-        {
-            // Cakisma olabilir; sessiz gec.
-        }
+        catch { }
     }
 
     private void OnHotkeyPressed(object? sender, int id)
     {
-        if (id == HotkeyShowWindow)
-        {
-            ShowRequested?.Invoke(this, EventArgs.Empty);
-        }
+        if (id == HotkeyShowWindow) ShowRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>Pencerenin gosterilmesi istendiginde firlatilir (Window tarafindan dinlenir).</summary>
     public event EventHandler? ShowRequested;
+    public event EventHandler? HideRequested;
 
-    public Mvvm.RelayCommand<GroupViewModel> SelectGroupCommand { get; }
+    public Mvvm.RelayCommand<TagViewModel> SelectTagCommand { get; }
     public Mvvm.AsyncRelayCommand<ClipboardItemViewModel> PasteItemCommand { get; }
-    public Mvvm.AsyncRelayCommand<ClipboardItemViewModel> AssignGroupCommand { get; }
-    public Mvvm.AsyncRelayCommand<ClipboardItemViewModel> AddTagCommand { get; }
     public Mvvm.AsyncRelayCommand<ClipboardItemViewModel> DeleteItemCommand { get; }
     public Mvvm.AsyncRelayCommand<ClipboardItemViewModel> ToggleFavoriteCommand { get; }
+    public Mvvm.AsyncRelayCommand<ClipboardItemViewModel> TogglePinCommand { get; }
     public Mvvm.AsyncRelayCommand<ClipboardItemViewModel> CopyToClipboardCommand { get; }
+    
+    public Mvvm.AsyncRelayCommand AddTagCommand { get; }
+    public Mvvm.RelayCommand<TagViewModel> BeginEditTagCommand { get; }
+    public Mvvm.AsyncRelayCommand<TagViewModel> EndEditTagCommand { get; }
+    public Mvvm.AsyncRelayCommand<object> ToggleItemTagCommand { get; }
 
-    public Mvvm.AsyncRelayCommand AddGroupCommand { get; }
-    public Mvvm.AsyncRelayCommand AddTagGlobalCommand { get; }
     public Mvvm.RelayCommand ClearSearchCommand { get; }
     public Mvvm.AsyncRelayCommand RefreshCommand { get; }
 
-    public string SelectedGroupName => SelectedGroup?.Name ?? "Tümü";
-
-    // ---- Yükleme ----
     public async Task InitializeAsync()
     {
-        await LoadGroupsAsync();
         await LoadTagsAsync();
         await LoadItemsAsync();
-    }
-
-    private async Task LoadGroupsAsync()
-    {
-        var groups = await _repo.GetGroupsAsync();
-        Groups.Clear();
-        Groups.Add(new GroupViewModel { Id = AllGroupsId, Name = "Tümü", Icon = "🗂️", IsSystem = true, IsSelected = true });
-        foreach (var g in groups.Where(g => !g.IsSystem))
-            Groups.Add(new GroupViewModel { Id = g.Id, Name = g.Name, Icon = g.Icon });
-        SelectedGroup = Groups[0];
     }
 
     private async Task LoadTagsAsync()
     {
         var tags = await _repo.GetTagsAsync();
-        AllTags.Clear();
-        foreach (var t in tags) AllTags.Add(t.Name);
+        Tags.Clear();
+        Tags.Add(new TagViewModel { Id = AllTagsId, Name = "Tümü", IsSystem = true, IsSelected = SelectedTag == null || SelectedTag.Id == AllTagsId });
+        foreach (var t in tags)
+        {
+            Tags.Add(new TagViewModel { Id = t.Id, Name = t.Name, IsSelected = SelectedTag?.Id == t.Id });
+        }
+        if (SelectedTag == null)
+            SelectedTag = Tags[0];
+        else
+            SelectedTag = Tags.FirstOrDefault(t => t.Id == SelectedTag.Id) ?? Tags[0];
+        
+        OnPropertyChanged(nameof(Tags));
     }
 
     private async Task LoadItemsAsync()
@@ -181,13 +161,12 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable
         IsLoading = true;
         try
         {
-            var groupId = SelectedGroup?.Id;
-            int? filterId = groupId is null or AllGroupsId ? null : groupId;
+            var tagId = SelectedTag?.Id;
+            int? filterId = tagId is null or AllTagsId ? null : tagId;
             var items = await _repo.GetItemsAsync(filterId, SearchText);
 
             Items.Clear();
-            foreach (var i in items)
-                Items.Add(MapToViewModel(i));
+            foreach (var i in items) Items.Add(MapToViewModel(i));
         }
         finally
         {
@@ -205,40 +184,27 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable
         CreatedAt = i.CreatedAt,
         IsFavorite = i.IsFavorite,
         IsPinned = i.IsPinned,
+        OrderIndex = i.OrderIndex,
         UseCount = i.UseCount,
-        GroupId = i.GroupId,
-        GroupName = i.Group?.Name,
         Tags = i.ItemTags.Select(it => it.Tag.Name).ToList()
     };
 
-    // ---- Arama (debounce'lu) ----
     private async Task DebouncedSearchAsync(CancellationToken ct)
     {
-        try
-        {
-            await Task.Delay(250, ct);
-            await LoadItemsAsync();
-        }
+        try { await Task.Delay(250, ct); await LoadItemsAsync(); }
         catch (TaskCanceledException) { }
     }
 
-    // ---- Pano olayi ----
     private void OnClipboardChanged(object? sender, ClipboardCapturedEventArgs e)
     {
         var app = Application.Current;
         if (app == null) return;
-
-        // UI thread'te calistirildigindan emin ol
         if (!app.Dispatcher.CheckAccess())
         {
             app.Dispatcher.BeginInvoke(() => OnClipboardChanged(sender, e));
             return;
         }
-
-        _ = Task.Run(() => SaveCapturedAsync(e)).ContinueWith(t =>
-        {
-            if (t.IsFaulted) { /* hata loglanabilir */ }
-        });
+        _ = Task.Run(() => SaveCapturedAsync(e));
     }
 
     private async Task SaveCapturedAsync(ClipboardCapturedEventArgs e)
@@ -260,7 +226,6 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable
                 item.Size = e.ImageBytes.Length;
                 item.Kind = ClipboardItemKind.Image;
                 break;
-
             case ClipboardItemKind.RichText:
                 item.Content = e.Text;
                 item.RichContent = e.RichText;
@@ -268,7 +233,6 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable
                 item.Title = MakeTitle(e.Text);
                 item.Size = e.Text?.Length ?? 0;
                 break;
-
             default:
                 item.Content = e.Text;
                 item.Kind = ClipboardItemKind.PlainText;
@@ -277,25 +241,20 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable
                 break;
         }
 
-        // Yinelenenleri atlama
-        if (s.SkipDuplicates && await IsDuplicateAsync(item))
-            return;
+        if (s.SkipDuplicates && await IsDuplicateAsync(item)) return;
 
         await _repo.AddItemAsync(item);
         await _repo.TrimToAsync(s.MaxItems);
 
-        // UI'i yenile (sadece aktif gorunum yuklenir)
         await Application.Current.Dispatcher.BeginInvoke(async () => await LoadItemsAsync());
     }
 
     private async Task<bool> IsDuplicateAsync(ClipboardItem item)
     {
-        // Son kayitla karsilastir
         await using var db = await App.DbFactory.CreateDbContextAsync();
         var last = await db.Items.OrderByDescending(i => i.CreatedAt).FirstOrDefaultAsync();
         if (last == null) return false;
-        if (item.Kind == ClipboardItemKind.Image)
-            return last.Kind == ClipboardItemKind.Image && last.Size == item.Size;
+        if (item.Kind == ClipboardItemKind.Image) return last.Kind == ClipboardItemKind.Image && last.Size == item.Size;
         return last.Content == item.Content;
     }
 
@@ -307,24 +266,16 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable
         return firstLine;
     }
 
-    // ---- Komutlar ----
     private async Task PasteItemAsync(ClipboardItemViewModel? vm)
     {
         if (vm == null) return;
-        var targetWindow = App.LastActiveWindow; // kapatma oncesinde saklanan HWND
+        var targetWindow = App.LastActiveWindow;
         HideRequested?.Invoke(this, EventArgs.Empty);
+        await Task.Delay(80);
 
-        await Task.Delay(80); // UI gizlenirken kisa bekleme
-
-        var item = new ClipboardItem
-        {
-            Kind = vm.Kind,
-            Content = vm.Content,
-            ImageFilePath = vm.ImageFilePath
-        };
+        var item = new ClipboardItem { Kind = vm.Kind, Content = vm.Content, ImageFilePath = vm.ImageFilePath };
         _pasteService.PasteItem(item, targetWindow);
 
-        // Kullanim sayacini guncelle
         await using var db = await App.DbFactory.CreateDbContextAsync();
         var entity = await db.Items.FindAsync(vm.Id);
         if (entity != null)
@@ -335,22 +286,13 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable
         }
     }
 
-    public event EventHandler? HideRequested;
-
     private async Task CopyOnlyAsync(ClipboardItemViewModel? vm)
     {
         if (vm == null) return;
-        var item = new ClipboardItem
-        {
-            Kind = vm.Kind,
-            Content = vm.Content,
-            ImageFilePath = vm.ImageFilePath
-        };
+        var item = new ClipboardItem { Kind = vm.Kind, Content = vm.Content, ImageFilePath = vm.ImageFilePath };
 
-        if (_listener is ClipboardListener cl)
-            cl.SuppressNext();
+        if (_listener is ClipboardListener cl) cl.SuppressNext();
 
-        // Panoya koy (PasteService ile ayni mantik ama SendInput yok)
         if (item.Kind == ClipboardItemKind.Image && !string.IsNullOrEmpty(item.ImageFilePath))
         {
             var bmp = new System.Windows.Media.Imaging.BitmapImage();
@@ -366,32 +308,6 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable
             System.Windows.Clipboard.SetText(item.Content);
         }
         await Task.CompletedTask;
-    }
-
-    private async Task AssignGroupAsync(ClipboardItemViewModel? vm)
-    {
-        if (vm == null) return;
-        var groups = await _repo.GetGroupsAsync();
-        var options = "Grup seç (id)\n" + string.Join("\n", groups.Select(g => $"{g.Id} - {g.Name}"));
-        var input = _dialogs.Prompt("Gruba Ata", options, vm.GroupId?.ToString() ?? "");
-        if (input == null) return;
-        if (int.TryParse(input, out var gid))
-        {
-            await _repo.AssignGroupAsync(vm.Id, gid);
-            await LoadItemsAsync();
-        }
-    }
-
-    private async Task AddTagAsync(ClipboardItemViewModel? vm)
-    {
-        if (vm == null) return;
-        var tag = _dialogs.Prompt("Etiket Ekle", "Etiket adı (virgülle birden fazla):", "");
-        if (string.IsNullOrWhiteSpace(tag)) return;
-        foreach (var t in tag.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            await _repo.AssignTagAsync(vm.Id, t);
-
-        await LoadTagsAsync();
-        await LoadItemsAsync();
     }
 
     private async Task DeleteItemAsync(ClipboardItemViewModel? vm)
@@ -413,23 +329,85 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable
             await db.SaveChangesAsync();
             vm.IsFavorite = e.IsFavorite;
         }
-        await Task.CompletedTask;
     }
 
-    private async Task AddGroupAsync()
+    private async Task TogglePinAsync(ClipboardItemViewModel? vm)
     {
-        var name = _dialogs.Prompt("Grup Ekle", "Grup adı:", "");
-        if (string.IsNullOrWhiteSpace(name)) return;
-        await _repo.AddGroupAsync(name.Trim());
-        await LoadGroupsAsync();
+        if (vm == null) return;
+        await using var db = await App.DbFactory.CreateDbContextAsync();
+        var e = await db.Items.FindAsync(vm.Id);
+        if (e != null)
+        {
+            e.IsPinned = !e.IsPinned;
+            await db.SaveChangesAsync();
+            await LoadItemsAsync();
+        }
     }
 
-    private async Task AddTagGlobalAsync()
+    private async Task AddTagAsync()
     {
-        var name = _dialogs.Prompt("Etiket Ekle", "Etiket adı:", "");
-        if (string.IsNullOrWhiteSpace(name)) return;
-        await _repo.AddTagAsync(name.Trim());
+        var tag = await _repo.AddTagAsync("YeniEtiket");
         await LoadTagsAsync();
+        var newTagVm = Tags.FirstOrDefault(t => t.Id == tag.Id);
+        if (newTagVm != null)
+        {
+            newTagVm.IsEditing = true;
+        }
+    }
+
+    private async Task SaveTagAsync(TagViewModel? tag)
+    {
+        if (tag == null || tag.IsSystem) return;
+        tag.IsEditing = false;
+        
+        if (string.IsNullOrWhiteSpace(tag.Name))
+        {
+            await _repo.DeleteTagAsync(tag.Id);
+        }
+        else
+        {
+            await _repo.UpdateTagAsync(tag.Id, tag.Name.Replace("#", "").Trim());
+        }
+        await LoadTagsAsync();
+        await LoadItemsAsync();
+    }
+
+    private async Task ToggleItemTagAsync(object? param)
+    {
+        if (param is object[] arr && arr.Length == 2 && arr[0] is ClipboardItemViewModel itemVm && arr[1] is TagViewModel tagVm)
+        {
+            await _repo.ToggleTagAsync(itemVm.Id, tagVm.Id);
+            await LoadItemsAsync();
+        }
+    }
+
+    public void DragOver(GongSolutions.Wpf.DragDrop.IDropInfo dropInfo)
+    {
+        if (dropInfo.Data is ClipboardItemViewModel && dropInfo.TargetItem is ClipboardItemViewModel)
+        {
+            dropInfo.DropTargetAdorner = GongSolutions.Wpf.DragDrop.DropTargetAdorners.Insert;
+            dropInfo.Effects = DragDropEffects.Move;
+        }
+    }
+
+    public void Drop(GongSolutions.Wpf.DragDrop.IDropInfo dropInfo)
+    {
+        if (dropInfo.Data is not ClipboardItemViewModel sourceItem || dropInfo.TargetItem is not ClipboardItemViewModel targetItem || sourceItem == targetItem)
+            return;
+
+        int oldIndex = Items.IndexOf(sourceItem);
+        int newIndex = dropInfo.InsertIndex;
+        if (oldIndex < newIndex) newIndex--;
+
+        Items.Move(oldIndex, newIndex);
+
+        var itemsToUpdate = new List<ClipboardItem>();
+        for (int i = 0; i < Items.Count; i++)
+        {
+            Items[i].OrderIndex = i;
+            itemsToUpdate.Add(new ClipboardItem { Id = Items[i].Id, OrderIndex = i });
+        }
+        _ = _repo.UpdateItemsOrderAsync(itemsToUpdate);
     }
 
     public void Dispose()

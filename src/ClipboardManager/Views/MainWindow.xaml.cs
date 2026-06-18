@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private readonly IClipboardListener _clipboardListener;
     private readonly IGlobalHotkeyService _hotkeyService;
     private readonly SettingsStore _settings;
+    private readonly System.Windows.Forms.NotifyIcon _notifyIcon;
 
     public MainWindow(MainViewModel viewModel,
                       IClipboardListener clipboardListener,
@@ -44,6 +45,32 @@ public partial class MainWindow : Window
         var s = _settings.Load();
         if (!double.IsNaN(s.WindowWidth)) Width = s.WindowWidth;
         if (!double.IsNaN(s.WindowHeight)) Height = s.WindowHeight;
+
+        // Tray icon ayarla
+        _notifyIcon = new System.Windows.Forms.NotifyIcon
+        {
+            Icon = System.Drawing.SystemIcons.Application,
+            Visible = true,
+            Text = "Clipboard & Asset Manager"
+        };
+        _notifyIcon.DoubleClick += (sender, args) => ShowFromTray();
+
+        var contextMenu = new System.Windows.Forms.ContextMenuStrip();
+        
+        var openMenuItem = new System.Windows.Forms.ToolStripMenuItem("Aç");
+        openMenuItem.Click += (sender, args) => ShowFromTray();
+        contextMenu.Items.Add(openMenuItem);
+        
+        var exitMenuItem = new System.Windows.Forms.ToolStripMenuItem("Çıkış");
+        exitMenuItem.Click += (sender, args) => 
+        {
+            _notifyIcon.Visible = false;
+            _notifyIcon.Dispose();
+            System.Windows.Application.Current.Shutdown();
+        };
+        contextMenu.Items.Add(exitMenuItem);
+
+        _notifyIcon.ContextMenuStrip = contextMenu;
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -117,9 +144,13 @@ public partial class MainWindow : Window
             DragMove();
     }
 
-    private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+    private void Minimize_Click(object sender, RoutedEventArgs e) => HideToTray();
 
-    private void Close_Click(object sender, RoutedEventArgs e) => HideToTray();
+    private void Close_Click(object sender, RoutedEventArgs e)
+    {
+        _notifyIcon.Visible = false;
+        System.Windows.Application.Current.Shutdown();
+    }
 
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
@@ -133,9 +164,8 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
-        // Pencere X ile kapatilirsa gizle; uygulama arka planda calismaya devam etsin.
-        // Tam cikis icin tray ikonu veya Alt+F4 kullanilabilir (basitlestirilmis hali: tamamen kapat).
         _viewModel.Dispose();
+        _notifyIcon.Dispose();
         base.OnClosing(e);
     }
 

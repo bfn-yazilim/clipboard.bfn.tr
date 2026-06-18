@@ -14,7 +14,7 @@ public class ClipboardRepository
     private readonly IDbContextFactory<AppDbContext> _factory;
     public ClipboardRepository(IDbContextFactory<AppDbContext> factory) => _factory = factory;
 
-    public async Task<List<ClipboardItem>> GetItemsAsync(int? groupId, string? search)
+    public async Task<List<ClipboardItem>> GetItemsAsync(int? tagId, string? search)
     {
         await using var db = await _factory.CreateDbContextAsync();
         var q = db.Items
@@ -22,8 +22,8 @@ public class ClipboardRepository
             .Include(i => i.ItemTags).ThenInclude(it => it.Tag)
             .AsQueryable();
 
-        if (groupId is > 0)
-            q = q.Where(i => i.GroupId == groupId);
+        if (tagId is > 0)
+            q = q.Where(i => i.ItemTags.Any(it => it.TagId == tagId));
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -35,6 +35,7 @@ public class ClipboardRepository
         }
 
         return await q.OrderByDescending(i => i.IsPinned)
+                      .ThenBy(i => i.OrderIndex)
                       .ThenByDescending(i => i.CreatedAt)
                       .ToListAsync();
     }
@@ -63,6 +64,21 @@ public class ClipboardRepository
     {
         await using var db = await _factory.CreateDbContextAsync();
         db.Items.Update(item);
+        await db.SaveChangesAsync();
+    }
+
+    public async Task UpdateItemsOrderAsync(List<ClipboardItem> items)
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        foreach (var item in items)
+        {
+            var dbItem = await db.Items.FindAsync(item.Id);
+            if (dbItem != null)
+            {
+                dbItem.OrderIndex = item.OrderIndex;
+                db.Items.Update(dbItem);
+            }
+        }
         await db.SaveChangesAsync();
     }
 
@@ -100,6 +116,28 @@ public class ClipboardRepository
         return t;
     }
 
+    public async Task UpdateTagAsync(int tagId, string newName)
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        var t = await db.Tags.FindAsync(tagId);
+        if (t != null)
+        {
+            t.Name = newName;
+            await db.SaveChangesAsync();
+        }
+    }
+
+    public async Task DeleteTagAsync(int tagId)
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        var t = await db.Tags.FindAsync(tagId);
+        if (t != null)
+        {
+            db.Tags.Remove(t);
+            await db.SaveChangesAsync();
+        }
+    }
+
     /// <summary>Bir ogeye etiket atar (yoksa etiketi olusturur).</summary>
     public async Task AssignTagAsync(int itemId, string tagName)
     {
@@ -112,6 +150,21 @@ public class ClipboardRepository
             db.ItemTags.Add(new ItemTag { ItemId = itemId, TagId = tag.Id });
             await db.SaveChangesAsync();
         }
+    }
+
+    public async Task ToggleTagAsync(int itemId, int tagId)
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        var it = await db.ItemTags.FirstOrDefaultAsync(x => x.ItemId == itemId && x.TagId == tagId);
+        if (it != null)
+        {
+            db.ItemTags.Remove(it);
+        }
+        else
+        {
+            db.ItemTags.Add(new ItemTag { ItemId = itemId, TagId = tagId });
+        }
+        await db.SaveChangesAsync();
     }
 
     public async Task RemoveTagAsync(int itemId, int tagId)
