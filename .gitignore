@@ -1,0 +1,30 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.userprefs
+project.lock.json
+TestResult.xml
+
+# Build artifacts
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+
+# Local runtime data (DB, images, settings - kullanıcıya özel)
+*.db
+*.db-shm
+*.db-wal
+appsettings.*.json
+
+# Logs
+*.log
+logs/
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
