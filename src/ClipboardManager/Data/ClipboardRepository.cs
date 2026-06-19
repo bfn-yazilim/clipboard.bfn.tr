@@ -138,6 +138,42 @@ public class ClipboardRepository
         }
     }
 
+    public async Task ClearUnpinnedItemsAsync()
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        var unpinnedItems = await db.Items.Where(i => !i.IsPinned).ToListAsync();
+        if (unpinnedItems.Any())
+        {
+            db.Items.RemoveRange(unpinnedItems);
+            await db.SaveChangesAsync();
+            
+            // Delete associated images if any
+            foreach (var item in unpinnedItems)
+            {
+                if (item.Kind == ClipboardItemKind.Image && !string.IsNullOrEmpty(item.ImageFilePath) && File.Exists(item.ImageFilePath))
+                {
+                    try { File.Delete(item.ImageFilePath); } catch { /* ignore */ }
+                }
+            }
+        }
+    }
+
+    public async Task DeleteTagAndItemsAsync(int tagId)
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        var t = await db.Tags.FindAsync(tagId);
+        if (t != null)
+        {
+            // O etikete sahip tum itemlari bul
+            var itemIds = await db.ItemTags.Where(it => it.TagId == tagId).Select(it => it.ItemId).ToListAsync();
+            var itemsToDelete = await db.Items.Where(i => itemIds.Contains(i.Id)).ToListAsync();
+            
+            db.Items.RemoveRange(itemsToDelete);
+            db.Tags.Remove(t); // Cascade ile ItemTag silinebilir, fakat manuel de silmis olduk
+            await db.SaveChangesAsync();
+        }
+    }
+
     /// <summary>Bir ogeye etiket atar (yoksa etiketi olusturur).</summary>
     public async Task AssignTagAsync(int itemId, string tagName)
     {

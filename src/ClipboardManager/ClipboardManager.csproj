@@ -14,9 +14,11 @@
     <Version>1.0.0</Version>
     <Company>BFN Yazilim</Company>
     <Product>Clipboard &amp; Asset Manager</Product>
+    <ApplicationIcon>Assets\app_icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
+    <Resource Include="Assets\app_icon.ico" />
     <Using Remove="System.Windows.Forms" />
   </ItemGroup>
 

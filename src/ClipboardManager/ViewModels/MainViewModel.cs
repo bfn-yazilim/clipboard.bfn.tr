@@ -87,13 +87,23 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable, GongSolutions.W
         AddTagCommand = new Mvvm.AsyncRelayCommand(AddTagAsync);
         BeginEditTagCommand = new Mvvm.RelayCommand<TagViewModel>(t => { if (t != null && !t.IsSystem) t.IsEditing = true; });
         EndEditTagCommand = new Mvvm.AsyncRelayCommand<TagViewModel>(SaveTagAsync);
+        DeleteTagOnlyCommand = new Mvvm.AsyncRelayCommand<TagViewModel>(DeleteTagOnlyAsync);
+        DeleteTagAndItemsCommand = new Mvvm.AsyncRelayCommand<TagViewModel>(DeleteTagAndItemsAsync);
         ToggleItemTagCommand = new Mvvm.AsyncRelayCommand<object>(ToggleItemTagAsync);
 
         ClearSearchCommand = new Mvvm.RelayCommand(() => SearchText = string.Empty);
         RefreshCommand = new Mvvm.AsyncRelayCommand(() => InitializeAsync());
+        ClearUnpinnedCommand = new Mvvm.AsyncRelayCommand(ClearUnpinnedAsync);
 
         _listener.ClipboardChanged += OnClipboardChanged;
         _ = InitializeAsync();
+    }
+
+    private async Task ClearUnpinnedAsync()
+    {
+        if (!_dialogs.Confirm("Temizle", "Sabitlenmemiş tüm kayıtlar silinsin mi?")) return;
+        await _repo.ClearUnpinnedItemsAsync();
+        await LoadItemsAsync();
     }
 
     public void AttachToWindow(IntPtr hwnd)
@@ -128,10 +138,13 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable, GongSolutions.W
     public Mvvm.AsyncRelayCommand AddTagCommand { get; }
     public Mvvm.RelayCommand<TagViewModel> BeginEditTagCommand { get; }
     public Mvvm.AsyncRelayCommand<TagViewModel> EndEditTagCommand { get; }
+    public Mvvm.AsyncRelayCommand<TagViewModel> DeleteTagOnlyCommand { get; }
+    public Mvvm.AsyncRelayCommand<TagViewModel> DeleteTagAndItemsCommand { get; }
     public Mvvm.AsyncRelayCommand<object> ToggleItemTagCommand { get; }
 
     public Mvvm.RelayCommand ClearSearchCommand { get; }
     public Mvvm.AsyncRelayCommand RefreshCommand { get; }
+    public Mvvm.AsyncRelayCommand ClearUnpinnedCommand { get; }
 
     public async Task InitializeAsync()
     {
@@ -368,6 +381,26 @@ public class MainViewModel : Mvvm.ObservableObject, IDisposable, GongSolutions.W
         {
             await _repo.UpdateTagAsync(tag.Id, tag.Name.Replace("#", "").Trim());
         }
+        await LoadTagsAsync();
+        await LoadItemsAsync();
+    }
+
+    private async Task DeleteTagOnlyAsync(TagViewModel? tag)
+    {
+        if (tag == null || tag.IsSystem) return;
+        if (!_dialogs.Confirm("Sil", $"'{tag.Name}' etiketini silmek istediğinize emin misiniz? (Öğeler silinmeyecek)")) return;
+        
+        await _repo.DeleteTagAsync(tag.Id);
+        await LoadTagsAsync();
+        await LoadItemsAsync();
+    }
+
+    private async Task DeleteTagAndItemsAsync(TagViewModel? tag)
+    {
+        if (tag == null || tag.IsSystem) return;
+        if (!_dialogs.Confirm("Tümüyle Sil", $"'{tag.Name}' etiketini ve İÇİNDEKİ TÜM ÖĞELERİ silmek istediğinize emin misiniz?\nBu işlem geri alınamaz!")) return;
+        
+        await _repo.DeleteTagAndItemsAsync(tag.Id);
         await LoadTagsAsync();
         await LoadItemsAsync();
     }

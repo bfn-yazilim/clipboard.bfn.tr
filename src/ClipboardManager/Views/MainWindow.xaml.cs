@@ -47,9 +47,10 @@ public partial class MainWindow : Window
         if (!double.IsNaN(s.WindowHeight)) Height = s.WindowHeight;
 
         // Tray icon ayarla
+        var iconStream = Application.GetResourceStream(new Uri("pack://application:,,,/Assets/app_icon.ico"))?.Stream;
         _notifyIcon = new System.Windows.Forms.NotifyIcon
         {
-            Icon = System.Drawing.SystemIcons.Application,
+            Icon = iconStream != null ? new System.Drawing.Icon(iconStream) : System.Drawing.SystemIcons.Application,
             Visible = true,
             Text = "Clipboard & Asset Manager"
         };
@@ -122,8 +123,6 @@ public partial class MainWindow : Window
         Show();
         Activate();
         Topmost = true;
-        // Focus'u search'a ver
-        SearchBox.Focus();
     }
 
     private void HideToTray()

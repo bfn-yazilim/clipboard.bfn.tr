@@ -5,6 +5,7 @@
         xmlns:conv="clr-namespace:ClipboardManager.Converters"
         xmlns:dd="urn:gong-wpf-dragdrop"
         Title="Clipboard &amp; Asset Manager"
+        Icon="pack://application:,,,/Assets/app_icon.ico"
         Height="600" Width="900"
         MinHeight="500" MinWidth="720"
         Background="{DynamicResource BackgroundBrush}"
@@ -18,25 +19,24 @@
         TextOptions.TextRenderingMode="ClearType"
         UseLayoutRounding="True">
 
-    <!-- Value converters -->
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <conv:HasTagConverter x:Key="HasTagConverter" />
         <conv:MultiObjectConverter x:Key="MultiObjectConverter" />
+        <conv:BindingProxy x:Key="Proxy" Data="{Binding}" />
     </Window.Resources>
 
-    <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+    <Border Background="{DynamicResource BackgroundBrush}" CornerRadius="12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" /> <!-- Title bar -->
-                <RowDefinition Height="Auto" /> <!-- Search bar -->
                 <RowDefinition Height="Auto" /> <!-- Tags bar -->
                 <RowDefinition Height="*" />    <!-- Body -->
                 <RowDefinition Height="Auto" /> <!-- Status bar -->
             </Grid.RowDefinitions>
 
             <!-- ============ TITLE BAR ============ -->
-            <Grid Grid.Row="0" Height="44" Background="{DynamicResource SurfaceBrush}" MouseLeftButtonDown="TitleBar_MouseDown">
+            <Grid Grid.Row="0" Height="44" Background="{DynamicResource BackgroundBrush}" MouseLeftButtonDown="TitleBar_MouseDown">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -65,67 +65,61 @@
                 </StackPanel>
             </Grid>
 
-            <!-- ============ SEARCH BAR ============ -->
-            <Grid Grid.Row="1" Margin="14,8,14,10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <Grid Grid.Column="0">
-                    <TextBox x:Name="SearchBox"
-                             Style="{StaticResource ModernTextBox}"
-                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=200}"
-                             Tag="🔎  İçerik veya etiket ara..." />
-                    <TextBlock IsHitTestVisible="False" VerticalAlignment="Center" Margin="14,0,0,0"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               Text="{Binding ElementName=SearchBox, Path=Tag}">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                </Grid>
-
-                <Button Grid.Column="1" Style="{StaticResource ModernButton}" Content="⟲ Yenile"
-                        Command="{Binding RefreshCommand}" Margin="8,0,0,0" />
-            </Grid>
-
             <!-- ============ TAGS BAR ============ -->
-            <Grid Grid.Row="2" Margin="14,0,14,10">
+            <Grid Grid.Row="1" Margin="14,0,14,10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                    <ItemsControl ItemsSource="{Binding Tags}">
-                        <ItemsControl.ItemsPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <ItemsControl ItemsSource="{Binding Tags}">
+                            <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <StackPanel Orientation="Horizontal" />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type vm:TagViewModel}">
-                                <Border Margin="0,0,6,0" CornerRadius="12" Padding="10,4"
-                                        BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"
+                                <Border Margin="0,0,6,0" CornerRadius="4" Padding="10,4"
                                         Cursor="Hand">
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                                            <Setter Property="BorderThickness" Value="0,0,0,2" />
+                                            <Setter Property="BorderBrush" Value="Transparent" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Border.Style>
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <ContextMenu.Style>
+                                                <Style TargetType="ContextMenu">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSystem}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ContextMenu.Style>
+                                            <MenuItem Header="✏️ Yeniden adlandır"
+                                                      Command="{Binding Data.BeginEditTagCommand, Source={StaticResource Proxy}}"
+                                                      CommandParameter="{Binding}" />
+                                            <Separator />
+                                            <MenuItem Header="🗑️ Sadece etiketi sil"
+                                                      Command="{Binding Data.DeleteTagOnlyCommand, Source={StaticResource Proxy}}"
+                                                      CommandParameter="{Binding}" />
+                                            <MenuItem Header="⚠️ Etiketi İÇERİKLERİYLE BERABER sil"
+                                                      Command="{Binding Data.DeleteTagAndItemsCommand, Source={StaticResource Proxy}}"
+                                                      CommandParameter="{Binding}"
+                                                      Foreground="Red" />
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
                                     <Border.InputBindings>
                                         <!-- Tek tiklama ile secimi degistir -->
                                         <MouseBinding MouseAction="LeftClick"
@@ -144,7 +138,7 @@
                                                     <Setter Property="Visibility" Value="Visible" />
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                            <Setter Property="Foreground" Value="White" />
+                                                            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsEditing}" Value="True">
                                                             <Setter Property="Visibility" Value="Collapsed" />
@@ -179,17 +173,21 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                </ScrollViewer>
 
-                <Button Grid.Column="1" Style="{StaticResource ModernButton}" Content="+" Width="28" Height="28" Padding="0"
-                        ToolTip="Yeni Etiket" Command="{Binding AddTagCommand}" />
-            </Grid>
+                    <Button Style="{StaticResource ModernButton}" Content="+" Width="28" Height="28" Padding="0" Margin="4,0,0,0"
+                            ToolTip="Yeni Etiket" Command="{Binding AddTagCommand}" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <Button Grid.Column="1" Style="{StaticResource ModernButton}" Content="Temizle" Height="28" Padding="12,0"
+                    ToolTip="Tümünü Temizle (Sabitlenmemiş olanlar)" Command="{Binding ClearUnpinnedCommand}" />
+        </Grid>
 
             <!-- ============ BODY ============ -->
-            <Grid Grid.Row="3" Margin="14,0,14,10">
+            <Grid Grid.Row="2" Margin="14,0,14,10">
                 <!-- ===== ITEMS GRID (3-column WrapPanel) ===== -->
-                <Border Background="{DynamicResource SurfaceBrush}"
-                        CornerRadius="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                <Border Background="Transparent"
+                        CornerRadius="8" BorderBrush="Transparent" BorderThickness="0">
                     <Grid>
                         <!-- Items -->
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8">
@@ -200,7 +198,7 @@
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <!-- 3 sütunlu yerlesim. Ekran genisledikce satirlar olusur. -->
-                                        <UniformGrid Columns="3" HorizontalAlignment="Stretch" />
+                                        <UniformGrid Columns="3" HorizontalAlignment="Stretch" VerticalAlignment="Top" />
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
@@ -212,17 +210,16 @@
                                                               CommandParameter="{Binding}" />
                                             </Border.InputBindings>
                                             <Border.ContextMenu>
-                                                <!-- Dinamik etiket menusu -->
                                                 <ContextMenu>
                                                     <MenuItem Header="📋 Yapıştır (auto)"
-                                                              Command="{Binding DataContext.PasteItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                              Command="{Binding Data.PasteItemCommand, Source={StaticResource Proxy}}"
                                                               CommandParameter="{Binding}" />
                                                     <MenuItem Header="📋 Sadece kopyala"
-                                                              Command="{Binding DataContext.CopyToClipboardCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                              Command="{Binding Data.CopyToClipboardCommand, Source={StaticResource Proxy}}"
                                                               CommandParameter="{Binding}" />
                                                     <Separator />
                                                     <MenuItem Header="🏷️ Etiketler" 
-                                                              ItemsSource="{Binding DataContext.Tags, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                              ItemsSource="{Binding Data.Tags, Source={StaticResource Proxy}}">
                                                         <MenuItem.ItemContainerStyle>
                                                             <Style TargetType="MenuItem">
                                                                 <Setter Property="Header" Value="{Binding DisplayName}" />
@@ -236,7 +233,7 @@
                                                                         </MultiBinding>
                                                                     </Setter.Value>
                                                                 </Setter>
-                                                                <Setter Property="Command" Value="{Binding DataContext.ToggleItemTagCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                                                <Setter Property="Command" Value="{Binding Data.ToggleItemTagCommand, Source={StaticResource Proxy}}" />
                                                                 <Setter Property="CommandParameter">
                                                                     <Setter.Value>
                                                                         <MultiBinding Converter="{StaticResource MultiObjectConverter}">
@@ -255,85 +252,77 @@
                                                         </MenuItem.ItemContainerStyle>
                                                     </MenuItem>
                                                     <MenuItem Header="⭐ Favorilere ekle/çıkar"
-                                                              Command="{Binding DataContext.ToggleFavoriteCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                              Command="{Binding Data.ToggleFavoriteCommand, Source={StaticResource Proxy}}"
                                                               CommandParameter="{Binding}" />
                                                     <Separator />
                                                     <MenuItem Header="🗑️ Sil"
-                                                              Command="{Binding DataContext.DeleteItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                              Command="{Binding Data.DeleteItemCommand, Source={StaticResource Proxy}}"
                                                               CommandParameter="{Binding}" />
                                                 </ContextMenu>
                                             </Border.ContextMenu>
 
-                                            <DockPanel LastChildFill="True">
-                                                <!-- Header row -->
-                                                <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="{Binding TypeIcon}" FontSize="14" />
-                                                    
-                                                    <!-- Pin button -->
-                                                    <Button Grid.Column="2" 
-                                                            Command="{Binding DataContext.TogglePinCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                            CommandParameter="{Binding}"
-                                                            Background="Transparent" BorderThickness="0" Cursor="Hand"
-                                                            ToolTip="Üste Sabitle">
-                                                        <TextBlock Text="📌" FontSize="14">
-                                                            <TextBlock.Style>
-                                                                <Style TargetType="TextBlock">
-                                                                    <Setter Property="Opacity" Value="0.4" />
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding IsPinned}" Value="True">
-                                                                            <Setter Property="Opacity" Value="1.0" />
-                                                                            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </TextBlock.Style>
-                                                        </TextBlock>
-                                                    </Button>
-                                                </Grid>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
 
-                                                <!-- Content preview -->
-                                                <Border DockPanel.Dock="Top" MaxHeight="45" ClipToBounds="True">
-                                                    <ContentControl>
-                                                        <ContentControl.Style>
-                                                            <Style TargetType="ContentControl">
+                                                <Grid ClipToBounds="True" Margin="0,0,4,0">
+                                                    <TextBlock Text="{Binding Preview}"
+                                                               TextWrapping="Wrap"
+                                                               FontSize="12"
+                                                               MaxHeight="45"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Visibility" Value="Visible" />
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding Kind}" Value="Image">
-                                                                        <Setter Property="Content">
-                                                                            <Setter.Value>
-                                                                                <Image Source="{Binding ImageFilePath}"
-                                                                                       Stretch="UniformToFill"
-                                                                                       HorizontalAlignment="Center" />
-                                                                            </Setter.Value>
-                                                                        </Setter>
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
-                                                        </ContentControl.Style>
-                                                        <TextBlock Text="{Binding Preview}"
-                                                                   TextWrapping="Wrap"
-                                                                   FontSize="12"
-                                                                   MaxHeight="45"
-                                                                   TextTrimming="CharacterEllipsis"
-                                                                   Foreground="{DynamicResource TextPrimaryBrush}" />
-                                                    </ContentControl>
-                                                </Border>
-
-                                                <!-- Footer -->
-                                                <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-                                                    <!-- Burada kutuya atanan etiketleri gosteriyoruz -->
-                                                    <TextBlock FontSize="10"
-                                                               Foreground="{DynamicResource AccentBrush}"
-                                                               TextTrimming="CharacterEllipsis">
-                                                        <Run Text="🏷️ " />
-                                                        <Run Text="{Binding TagsDisplay, Mode=OneWay}" />
+                                                        </TextBlock.Style>
                                                     </TextBlock>
-                                                </StackPanel>
-                                            </DockPanel>
+                                                    <Image Source="{Binding ImageFilePath}"
+                                                           Stretch="Uniform"
+                                                           MaxHeight="80"
+                                                           HorizontalAlignment="Center">
+                                                        <Image.Style>
+                                                            <Style TargetType="Image">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Kind}" Value="Image">
+                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Image.Style>
+                                                    </Image>
+                                                </Grid>
+
+                                                <!-- Pin button -->
+                                                <Button Grid.Column="1" VerticalAlignment="Top" Margin="4,0,0,0"
+                                                        Style="{StaticResource IconButtonStyle}"
+                                                        Command="{Binding DataContext.TogglePinCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip="Üste Sabitle">
+                                                    <TextBlock Text="📌" FontSize="14">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Opacity" Value="0.4" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                                                                        <Setter Property="Opacity" Value="1.0" />
+                                                                        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Button>
+                                            </Grid>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

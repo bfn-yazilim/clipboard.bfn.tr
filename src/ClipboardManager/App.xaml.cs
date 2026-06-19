@@ -74,27 +74,6 @@ public partial class App : System.Windows.Application
             
             // Mevcut veritabani silinmesin diye yeni OrderIndex sutununu manuel ekleyelim (eger yoksa)
             try { db.Database.ExecuteSqlRaw("ALTER TABLE Items ADD COLUMN OrderIndex INTEGER NOT NULL DEFAULT 0;"); } catch { }
-
-            // Eski Gruplari Etikete donustur ve atamalari yap
-            try
-            {
-                db.Database.ExecuteSqlRaw(@"
-                    INSERT INTO Tags (Name, Color, CreatedAt)
-                    SELECT Name, '#3B82F6', CURRENT_TIMESTAMP FROM Groups WHERE Name NOT IN (SELECT Name FROM Tags);
-                    
-                    INSERT INTO ItemTags (ItemId, TagId)
-                    SELECT i.Id, t.Id 
-                    FROM Items i 
-                    JOIN Groups g ON i.GroupId = g.Id 
-                    JOIN Tags t ON g.Name = t.Name
-                    WHERE NOT EXISTS (SELECT 1 FROM ItemTags it WHERE it.ItemId = i.Id AND it.TagId = t.Id);
-                    
-                    UPDATE Items SET GroupId = NULL;
-                ");
-            }
-            catch { }
-
-            DbSeeder.SeedDefaults(db);
         }
 
         var mainWindow = Services.GetRequiredService<MainWindow>();

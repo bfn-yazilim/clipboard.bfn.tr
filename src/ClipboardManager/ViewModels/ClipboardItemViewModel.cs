@@ -81,7 +81,7 @@ public class ClipboardItemViewModel : Mvvm.ObservableObject
         }
     }
 
-    public string TagsDisplay => Tags.Count == 0 ? "—" : string.Join(" ", Tags.Select(t => "#" + t));
+    public string TagsDisplay => Tags.Count == 0 ? "—" : string.Join(" ", Tags);
 
     /// <summary>UI yardimcilari:</summary>
     public string TypeIcon => Kind switch

@@ -17,7 +17,7 @@ public class TagViewModel : Mvvm.ObservableObject
         }
     }
 
-    public string DisplayName => $"#{Name}";
+    public string DisplayName => Name;
 
     private bool _isSelected;
     public bool IsSelected
