@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Clipboard Manager</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Windows için hafif pano geçmişi. Alt + V ile aç, tıkla, imlecin olduğu yere yapışsın. Veriler yalnızca bilgisayarınızda.">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: asimetrik hero (metin + gerçek uygulama penceresi), altında tek sütunlu dar bölümler; tuş başlıkları sitenin imzası. */
+:root {
+  --bg: #f5f5f9;
+  --surface: #ffffff;
+  --ink: #17162b;
+  --muted: #5d5b78;
+  --line: #e2e1ee;
+  --accent: #4f46e5;
+  --accent-ink: #ffffff;
+  --accent-soft: #eceafe;
+  --star: #f59e0b;
+  --key-top: #ffffff;
+  --key-side: #d9d8e6;
+  --key-ink: #2a2942;
+  --shadow: 0 30px 60px -20px rgb(35 30 90 / 0.28), 0 12px 24px -12px rgb(35 30 90 / 0.18);
+
+  --display: "Bricolage Grotesque", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --body: "Instrument Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0e16; --surface: #171723; --ink: #ecebf7; --muted: #a09eba; --line: #2a2940;
+    --accent: #8b85ff; --accent-ink: #0e0e16; --accent-soft: #221f45; --star: #fbbf24;
+    --key-top: #23223a; --key-side: #0a0a12; --key-ink: #e6e5f5;
+    --shadow: 0 30px 60px -20px rgb(0 0 0 / 0.7), 0 12px 24px -12px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e0e16; --surface: #171723; --ink: #ecebf7; --muted: #a09eba; --line: #2a2940;
+  --accent: #8b85ff; --accent-ink: #0e0e16; --accent-soft: #221f45; --star: #fbbf24;
+  --key-top: #23223a; --key-side: #0a0a12; --key-ink: #e6e5f5;
+  --shadow: 0 30px 60px -20px rgb(0 0 0 / 0.7), 0 12px 24px -12px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 1.0625rem/1.6 var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+
+.wrap {
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+@media (min-width: 720px) {
+  .wrap { padding-left: max(32px, env(safe-area-inset-left, 0px)); padding-right: max(32px, env(safe-area-inset-right, 0px)); }
+}
+
+/* ---------- Üst çubuk ---------- */
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 20px; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 1.05rem/1 var(--display); text-decoration: none; }
+.brand img { width: 28px; height: 28px; }
+.nav-links { display: flex; gap: 20px; font-size: 0.95rem; color: var(--muted); }
+.nav-links a { text-decoration: none; }
+.nav-links a:hover { color: var(--ink); }
+@media (max-width: 560px) { .nav-links .opt { display: none; } }
+
+/* ---------- Tuş başlıkları ---------- */
+kbd, .key {
+  font: 700 0.8em/1 var(--mono);
+  color: var(--key-ink);
+  background: var(--key-top);
+  border: 1px solid var(--key-side);
+  border-bottom-width: 3px;
+  border-radius: 6px;
+  padding: 0.3em 0.5em 0.25em;
+  white-space: nowrap;
+}
+.keys { display: flex; align-items: center; gap: 14px; margin-block: 8px 28px; }
+.keys .key {
+  font-size: clamp(1.4rem, 3.4vw, 2rem);
+  min-width: 2.6em;
+  text-align: center;
+  padding: 0.55em 0.6em 0.45em;
+  border-radius: 12px;
+  border-bottom-width: 6px;
+  box-shadow: 0 10px 20px -12px rgb(20 20 60 / 0.35);
+  animation: press 3.2s ease-in-out 1s infinite;
+}
+.keys .key + .plus + .key { animation-delay: 1.12s; }
+.keys .plus { font: 500 1.4rem/1 var(--mono); color: var(--muted); }
+@keyframes press {
+  0%, 18%, 100% { transform: translateY(0); border-bottom-width: 6px; }
+  6%, 12% { transform: translateY(4px); border-bottom-width: 2px; }
+}
+@media (prefers-reduced-motion: reduce) { .keys .key { animation: none; } }
+
+/* ---------- Hero ---------- */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 56px;
+  align-items: center;
+  padding-block: 40px 88px;
+}
+.eyebrow { font: 600 0.8rem/1 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0 0 18px; }
+h1 {
+  font: 800 clamp(2.4rem, 5.6vw, 4.1rem)/1.02 var(--display);
+  letter-spacing: -0.03em;
+  margin: 0 0 22px;
+  text-wrap: balance;
+}
+.lede { color: var(--muted); font-size: 1.15rem; max-width: 34ch; margin: 0 0 8px; }
+.cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  font: 600 1rem/1 var(--body);
+  padding: 15px 22px;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { transform: translateY(-1px); }
+.btn-ghost { color: var(--ink); border: 1px solid var(--line); background: var(--surface); }
+.btn-ghost:hover { border-color: var(--muted); }
+.btn svg { width: 18px; height: 18px; }
+.meta { font: 500 0.82rem/1.4 var(--mono); color: var(--muted); margin-top: 16px; }
+
+.window { position: relative; justify-self: center; width: min(100%, 440px); }
+.window .frame {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.tip {
+  position: absolute;
+  left: -28px; bottom: 64px;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  box-shadow: var(--shadow);
+}
+.tip .star { color: var(--star); }
+@media (max-width: 880px) {
+  .hero { grid-template-columns: minmax(0, 1fr); gap: 48px; padding-block: 24px 64px; }
+  .tip { left: 12px; bottom: 16px; }
+}
+
+/* Tema duyarlı görseller: açık temada açık, koyu temada koyu ekran görüntüsü. */
+.shot-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .shot-dark { display: block; }
+  :root:not([data-theme="light"]) .shot-light { display: none; }
+}
+:root[data-theme="dark"] .shot-dark { display: block; }
+:root[data-theme="dark"] .shot-light { display: none; }
+
+/* ---------- Bölümler ---------- */
+section { padding-block: 72px; border-top: 1px solid var(--line); }
+h2 {
+  font: 700 clamp(1.7rem, 3.4vw, 2.4rem)/1.1 var(--display);
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+  text-wrap: balance;
+}
+.section-lede { color: var(--muted); max-width: 60ch; margin: 0 0 40px; }
+
+/* Nasıl çalışır: gerçek bir sıra, numaralar bilgi taşıyor. */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; counter-reset: step; }
+.steps li { counter-increment: step; display: grid; gap: 10px; align-content: start; }
+.steps li::before {
+  content: counter(step);
+  font: 700 0.85rem/1 var(--mono);
+  color: var(--accent);
+  background: var(--accent-soft);
+  width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center;
+}
+.steps h3 { font: 700 1.2rem/1.2 var(--display); margin: 4px 0 0; }
+.steps p { margin: 0; color: var(--muted); }
+@media (max-width: 760px) { .steps { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
+
+.features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px 32px; }
+.feature { min-width: 0; }
+.feature .glyph {
+  width: 36px; height: 36px; border-radius: 8px;
+  display: grid; place-items: center;
+  font: 700 0.95rem/1 var(--mono);
+  background: var(--accent-soft); color: var(--accent);
+  margin-bottom: 14px;
+}
+.feature h3 { font: 700 1.1rem/1.25 var(--display); margin: 0 0 6px; }
+.feature p { margin: 0; color: var(--muted); font-size: 0.98rem; }
+@media (max-width: 860px) { .features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 540px) { .features { grid-template-columns: minmax(0, 1fr); } }
+
+.gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+.gallery figure { margin: 0; display: grid; gap: 14px; }
+.gallery .frame { border-radius: 12px; overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); background: var(--surface); }
+.gallery figcaption { font-size: 0.95rem; color: var(--muted); }
+.gallery figcaption strong { color: var(--ink); font-weight: 600; }
+@media (max-width: 640px) { .gallery { grid-template-columns: minmax(0, 1fr); } }
+
+.shortcuts { width: 100%; border-collapse: collapse; font-size: 0.98rem; }
+.shortcuts td { padding: 14px 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.shortcuts td:first-child { width: 42%; padding-right: 16px; }
+.shortcuts kbd { font-size: 0.82rem; }
+.shortcuts .global { font: 500 0.72rem/1 var(--mono); color: var(--accent); margin-left: 8px; letter-spacing: 0.04em; text-transform: uppercase; }
+.table-scroll { overflow-x: auto; }
+
+.download {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 48px;
+  align-items: start;
+}
+.download h2 { font-size: clamp(2rem, 4.4vw, 3rem); }
+.reqs { margin: 0; display: grid; gap: 14px; }
+.reqs div { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.reqs dt { font: 500 0.82rem/1.6 var(--mono); color: var(--muted); }
+.reqs dd { margin: 0; font-size: 0.98rem; min-width: 0; overflow-wrap: anywhere; }
+.reqs code { font: 500 0.85em var(--mono); }
+@media (max-width: 760px) {
+  .download { grid-template-columns: minmax(0, 1fr); }
+  .reqs div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
+
+footer { border-top: 1px solid var(--line); padding-block: 28px 40px; color: var(--muted); font-size: 0.9rem; }
+footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+</style>
+</head>
+<body>
+
+<header class="wrap nav">
+  <a class="brand" href="#">
+    <img src="favicon.png" alt="" width="28" height="28">
+    Clipboard Manager
+  </a>
+  <nav class="nav-links" aria-label="Sayfa içi">
+    <a class="opt" href="#ozellikler">Özellikler</a>
+    <a class="opt" href="#kisayollar">Kısayollar</a>
+    <a href="#indir">İndir</a>
+  </nav>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <div>
+      <p class="eyebrow">Windows 10 ve 11 için pano geçmişi</p>
+      <h1>Kopyaladığın her şey iki tuş uzağında.</h1>
+      <div class="keys" aria-label="Kısayol: Alt artı V">
+        <span class="key">Alt</span><span class="plus">+</span><span class="key">V</span>
+      </div>
+      <p class="lede">Geçmişi imlecin yanında aç, bir öğeye tıkla, çalıştığın yere yapışsın. Arka planda neredeyse hiç kaynak harcamaz.</p>
+      <div class="cta" style="margin-top:28px">
+        <a class="btn btn-primary" data-download href="https://github.com/sooneer/clipboard-manager/releases/latest">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Windows için indir
+        </a>
+        <a class="btn btn-ghost" data-repo href="https://github.com/sooneer/clipboard-manager">Kaynak kodu</a>
+      </div>
+      <p class="meta">Ücretsiz · 64-bit · v0.1.0</p>
+    </div>
+
+    <div class="window">
+      <div class="frame">
+        <img class="shot-light" src="screenshots/liste-acik.png" width="600" height="800" alt="Clipboard Manager ana ekranı: arama çubuğu, etiketler, sabitlenmiş öğeler ve pano geçmişi listesi">
+        <img class="shot-dark" src="screenshots/liste-koyu.png" width="600" height="800" alt="Clipboard Manager ana ekranı, koyu tema">
+      </div>
+      <div class="tip"><span class="star">★</span> Yıldızlı öğeler hiç silinmez</div>
+    </div>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <h2>Üç adımda kullanım</h2>
+      <p class="section-lede">Yeni bir alışkanlık edinmeniz gerekmiyor. Her zamanki gibi kopyalayın, gerisini uygulama halleder.</p>
+      <ol class="steps">
+        <li>
+          <h3>Her zamanki gibi kopyala</h3>
+          <p><kbd>Ctrl</kbd> <kbd>C</kbd> ile neyi kopyalarsanız (metin, link, dosya yolu, görsel) kaynak uygulamasıyla birlikte kaydedilir.</p>
+        </li>
+        <li>
+          <h3><kbd>Alt</kbd> <kbd>V</kbd> ile aç</h3>
+          <p>Pencere farenin olduğu yerde açılır. Yazmaya başlayınca liste anında süzülür.</p>
+        </li>
+        <li>
+          <h3>Tıkla, yapışsın</h3>
+          <p>Seçtiğiniz öğe, pencereyi açmadan önce çalıştığınız uygulamada imlecin olduğu yere yapıştırılır.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="ozellikler">
+    <div class="wrap">
+      <h2>Küçük, hızlı, sizin bilgisayarınızda</h2>
+      <p class="section-lede">Rust ve Tauri ile yazıldı. Pano değişikliklerini Windows'un kendi bildirimiyle dinler, saniyede bir kontrol eden bir döngü yoktur.</p>
+      <div class="features">
+        <div class="feature">
+          <div class="glyph">★</div>
+          <h3>Sabitle</h3>
+          <p>Sık kullandığınız metinleri yıldızlayın. En üstte ayrı bir grupta durur, otomatik temizlik onlara dokunmaz.</p>
+        </div>
+        <div class="feature">
+          <div class="glyph">#</div>
+          <h3>Etiketler</h3>
+          <p>"İş", "Kod", "Linkler" gibi etiketler oluşturun. Her etiketin yanında kaç öğe olduğu görünür.</p>
+        </div>
+        <div class="feature">
+          <div class="glyph">***</div>
+          <h3>Parolaları kaydetmez</h3>
+          <p>KeePass, 1Password, Bitwarden gibi parola yöneticilerinden gelen kopyalar geçmişe yazılmaz.</p>
+        </div>
+        <div class="feature">
+          <div class="glyph">T</div>
+          <h3>Türü ve kaynağı belli</h3>
+          <p>Metin, link, dosya yolu ve görsel ayrı işaretlenir. Karakter sayısı, saat ve kopyalandığı uygulama altında yazar.</p>
+        </div>
+        <div class="feature">
+          <div class="glyph">▣</div>
+          <h3>Görseller de dahil</h3>
+          <p>Ekran görüntüleri ve kopyalanan resimler PNG olarak saklanır. İstemezseniz ayarlardan kapatabilirsiniz.</p>
+        </div>
+        <div class="feature">
+          <div class="glyph">⌂</div>
+          <h3>Veriler yerel</h3>
+          <p>Geçmiş, bilgisayarınızdaki bir SQLite dosyasında tutulur. Hesap yok, bulut yok, internete veri gitmez.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Ekran görüntüleri</h2>
+      <p class="section-lede">Koyu, açık veya Windows temasını izleyen görünüm. Bu sayfadaki görseller de cihazınızın temasına göre değişir.</p>
+      <div class="gallery">
+        <figure>
+          <div class="frame">
+            <img class="shot-light" src="screenshots/liste-acik.png" width="600" height="800" loading="lazy" alt="Pano geçmişi listesi, açık tema">
+            <img class="shot-dark" src="screenshots/liste-koyu.png" width="600" height="800" loading="lazy" alt="Pano geçmişi listesi, koyu tema">
+          </div>
+          <figcaption><strong>Geçmiş.</strong> Arama, etiket sekmeleri, sabitlenmiş öğeler ve tek tıkla temizleme.</figcaption>
+        </figure>
+        <figure>
+          <div class="frame">
+            <img class="shot-light" src="screenshots/ayarlar-acik.png" width="600" height="800" loading="lazy" alt="Ayarlar ekranı, açık tema">
+            <img class="shot-dark" src="screenshots/ayarlar-koyu.png" width="600" height="800" loading="lazy" alt="Ayarlar ekranı, koyu tema">
+          </div>
+          <figcaption><strong>Ayarlar.</strong> Kısayollar, saklama süresi ve öğe limiti, Windows ile başlatma, etiket yönetimi.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="kisayollar">
+    <div class="wrap">
+      <h2>Klavyeden ayrılmadan</h2>
+      <p class="section-lede">Global kısayollar her uygulamada çalışır ve ayarlardan değiştirilebilir.</p>
+      <div class="table-scroll">
+        <table class="shortcuts">
+          <tbody>
+            <tr><td><kbd>Alt</kbd> <kbd>V</kbd><span class="global">global</span></td><td>Geçmişi imlecin yanında aç veya kapat</td></tr>
+            <tr><td><kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>V</kbd><span class="global">global</span></td><td>Son kopyalananı biçimsiz düz metin olarak yapıştır</td></tr>
+            <tr><td>Tıklama</td><td>Kopyala ve önceki uygulamaya yapıştır</td></tr>
+            <tr><td><kbd>↑</kbd> <kbd>↓</kbd> <kbd>Enter</kbd></td><td>Listede gez, seçileni panoya kopyala</td></tr>
+            <tr><td><kbd>Shift</kbd> <kbd>Enter</kbd></td><td>Kopyala ve yapıştır</td></tr>
+            <tr><td><kbd>Ctrl</kbd> <kbd>F</kbd></td><td>Aramaya geç</td></tr>
+            <tr><td><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Del</kbd></td><td>Geçmişi temizle (sabitlenmişler kalır)</td></tr>
+            <tr><td><kbd>Ctrl</kbd> <kbd>,</kbd></td><td>Ayarlar</td></tr>
+            <tr><td>Sağ tık</td><td>Etiket ata, sabitle, sil</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="indir">
+    <div class="wrap download">
+      <div>
+        <h2>İndir ve kur</h2>
+        <p class="section-lede" style="margin-bottom:28px">Kurulum yönetici izni istemez ve bir dakikadan kısa sürer. Kurulumdan sonra uygulama sistem tepsisinde çalışır.</p>
+        <div class="cta">
+          <a class="btn btn-primary" data-download href="https://github.com/sooneer/clipboard-manager/releases/latest">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Windows için indir
+          </a>
+          <a class="btn btn-ghost" data-releases href="https://github.com/sooneer/clipboard-manager/releases">Tüm sürümler</a>
+        </div>
+      </div>
+      <dl class="reqs">
+        <div><dt>Sistem</dt><dd>Windows 10 veya 11, 64-bit</dd></div>
+        <div><dt>Gereksinim</dt><dd>Microsoft Edge WebView2. Windows 11'de hazır gelir, yoksa kurulum indirir.</dd></div>
+        <div><dt>Veriler</dt><dd><code>%APPDATA%\net.soneracar.clipboardmanager</code></dd></div>
+        <div><dt>İlk açılış</dt><dd>"Windows bilgisayarınızı korudu" uyarısı çıkarsa <strong>Ek bilgi</strong> ve ardından <strong>Yine de çalıştır</strong> seçin.</dd></div>
+      </dl>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Clipboard Manager · Rust ve Tauri ile yapıldı</span>
+    <a data-repo href="https://github.com/sooneer/clipboard-manager">GitHub</a>
+  </div>
+</footer>
+
+<script>
+  // Depo adresini tek yerden değiştirmek için.
+  const REPO = "https://github.com/sooneer/clipboard-manager";
+  document.querySelectorAll("[data-repo]").forEach((a) => (a.href = REPO));
+  document.querySelectorAll("[data-releases]").forEach((a) => (a.href = REPO + "/releases"));
+  document.querySelectorAll("[data-download]").forEach((a) => (a.href = REPO + "/releases/latest"));
+</script>
+</body>
+</html>

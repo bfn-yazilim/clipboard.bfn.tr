@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/* Tema, <html> üzerindeki .dark sınıfıyla kontrol edilir (useTheme). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-white text-zinc-900 antialiased select-none dark:bg-zinc-900 dark:text-zinc-100;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+}
+
+input {
+  @apply select-text;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-zinc-300 dark:bg-zinc-700;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
