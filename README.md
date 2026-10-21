@@ -50,4 +50,4 @@ npm run tauri build    # NSIS kurulum dosyası: src-tauri/target/release/bundle/
 | Sol tık | Kopyala ve imlecin olduğu yere yapıştır |
 | Sağ tık | Etiket atama, sabitleme, silme |
 
-Veriler `%APPDATA%\net.soneracar.clipboardmanager\` altında saklanır (`clipboard.db`, `images/`).
+Veriler `%APPDATA%\tr.bfn.clipboard\` altında saklanır (`clipboard.db`, `images/`).
