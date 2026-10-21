@@ -36,3 +36,12 @@ jobs:
           releaseBody: Kurulum için aşağıdaki `-setup.exe` dosyasını indirin.
           releaseDraft: false
           prerelease: false
+
+      # Kurulumsuz exe; sabit ad sayesinde site /releases/latest/download/ ile bağlanabilir.
+      - name: Upload portable exe
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp src-tauri/target/release/clipboard-manager.exe ClipboardManager-portable.exe
+          gh release upload "${{ github.ref_name }}" ClipboardManager-portable.exe --clobber

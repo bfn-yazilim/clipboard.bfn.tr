@@ -407,6 +407,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Windows için indir
           </a>
+          <a class="btn btn-ghost" data-portable href="https://github.com/bfn-yazilim/clipboard.bfn.tr/releases/latest/download/ClipboardManager-portable.exe">Portable exe</a>
           <a class="btn btn-ghost" data-releases href="https://github.com/bfn-yazilim/clipboard.bfn.tr/releases">Tüm sürümler</a>
         </div>
       </div>
@@ -414,6 +415,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
         <div><dt>Sistem</dt><dd>Windows 10 veya 11, 64-bit</dd></div>
         <div><dt>Gereksinim</dt><dd>Microsoft Edge WebView2. Windows 11'de hazır gelir, yoksa kurulum indirir.</dd></div>
         <div><dt>Veriler</dt><dd><code>%APPDATA%\tr.bfn.clipboard</code></dd></div>
+        <div><dt>Portable</dt><dd>Kurulum gerektirmez, tek exe olarak çalışır. Ayarlar ve geçmiş yine bilgisayarda saklanır.</dd></div>
         <div><dt>İlk açılış</dt><dd>"Windows bilgisayarınızı korudu" uyarısı çıkarsa <strong>Ek bilgi</strong> ve ardından <strong>Yine de çalıştır</strong> seçin.</dd></div>
       </dl>
     </div>
@@ -433,6 +435,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   document.querySelectorAll("[data-repo]").forEach((a) => (a.href = REPO));
   document.querySelectorAll("[data-releases]").forEach((a) => (a.href = REPO + "/releases"));
   document.querySelectorAll("[data-download]").forEach((a) => (a.href = REPO + "/releases/latest"));
+  document.querySelectorAll("[data-portable]").forEach((a) => (a.href = REPO + "/releases/latest/download/ClipboardManager-portable.exe"));
 </script>
 </body>
 </html>
